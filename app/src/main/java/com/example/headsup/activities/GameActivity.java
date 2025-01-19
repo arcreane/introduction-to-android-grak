@@ -99,7 +99,9 @@ public class GameActivity extends AppCompatActivity{
         cameraManager = new CameraManager(this, cameraPreview);
 
         // Replace camera setup with CameraManager initialization
+        if (checkPermissions()) {
         cameraManager.startCamera(this);
+        } else{
             Toast.makeText(this, "Camera permission required", Toast.LENGTH_SHORT).show();
         }
 
@@ -113,6 +115,35 @@ public class GameActivity extends AppCompatActivity{
         });
     }
 
+    private boolean checkPermissions() {
+        boolean cameraGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED;
+        boolean audioGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
+
+        if (!cameraGranted || !audioGranted) {
+            ActivityCompat.requestPermissions(
+                    this,
+                    new String[]{
+                            Manifest.permission.CAMERA,
+                            Manifest.permission.RECORD_AUDIO
+                    },
+                    CAMERA_PERMISSION_REQUEST
+            );
+            return false;
+        }
+        return true;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == CAMERA_PERMISSION_REQUEST) {
+            if (grantResults.length > 0 &&
+                    grantResults[0] == PackageManager.PERMISSION_GRANTED &&
+                    grantResults[1] == PackageManager.PERMISSION_GRANTED) {
+                cameraManager.startCamera(this);
+            }
+        }
+    }
 
     private void initializeViews() {
         try {
@@ -290,6 +321,7 @@ public class GameActivity extends AppCompatActivity{
         currentWordIndex = 0;
         showNextWord();
         startTimer();
+            cameraManager.startRecording();
     }
 
     private void startTimer() {
@@ -430,7 +462,7 @@ public class GameActivity extends AppCompatActivity{
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        
+        cameraManager.shutdown();
         // Release MediaPlayer resources
         if (soundManager != null) {
             soundManager.release();
