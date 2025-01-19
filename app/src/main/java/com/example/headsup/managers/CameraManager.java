@@ -44,6 +44,19 @@ public class CameraManager {
         this.cameraExecutor = Executors.newSingleThreadExecutor();
     }
 
+    public void startCamera(LifecycleOwner lifecycleOwner) {
+        ListenableFuture<ProcessCameraProvider> cameraProviderFuture =
+                ProcessCameraProvider.getInstance(context);
+        cameraProviderFuture.addListener(() -> {
+            try {
+                cameraProvider = cameraProviderFuture.get();
+                bindPreview(lifecycleOwner);
+            } catch (Exception e) {
+                Log.e(TAG, "Error starting camera", e);
+            }
+        }, ContextCompat.getMainExecutor(context));
+    }
+
     private void bindPreview(LifecycleOwner lifecycleOwner) {
         Preview preview = new Preview.Builder().build();
         preview.setSurfaceProvider(previewView.getSurfaceProvider());
