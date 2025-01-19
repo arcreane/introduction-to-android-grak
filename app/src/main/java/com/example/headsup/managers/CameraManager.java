@@ -132,6 +132,8 @@ public class CameraManager {
     }
 
     public void stopRecording() {
+        if (!isRecording || currentRecording == null) return;
+
         currentRecording.stop();
         currentRecording = null;
         isRecording = false;
@@ -142,7 +144,9 @@ public class CameraManager {
     }
 
     public void shutdown() {
-        
+        if (isRecording) {
+            stopRecording();
+        }
         cameraExecutor.shutdown();
     }
 } 
