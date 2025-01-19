@@ -1,3 +1,21 @@
 <resources>
-    <string name="app_name">headsup</string>
+    <string name="app_name">Heads Up</string>
+    <string name="deck_image_description">Deck cover image</string>
+    <string name="cards_label">Cards</string>
+    <string name="best_score_label">Best Score</string>
+    <string name="times_played_label">Times Played</string>
+    <string name="play_now">PLAY NOW</string>
+    <string name="welcome_messsage_game">Place on Forehead</string>
+    <string name="correct_message">CORRECT</string>
+    <string name="pass_message">PASS</string>
+    <string name="endgame_message">Game Over</string>
+    <string name="endgame_timer">0:00</string>
+    <string name="deck1_title">Pop Culture</string>
+    <string name="deck1_desc">A mix of memes, viral trends, famous franchises, and internet phenomena that shaped our digital world. From Baby Yoda to Pokemon, test your knowledge of what\'s trending!</string>
+    <string name="deck2_title">Crazy Animals</string>
+    <string name="deck2_desc">From the mighty lions to the playful dolphins, this category features creatures from all corners of the Earth. Explore the animal kingdom through fun charades!</string>
+    <string name="deck3_title">Act it Out</string>
+    <string name="deck3_desc">Get ready to move! Use your body language and gestures to act out everyday actions and activities. No words allowed - just pure theatrical fun!</string>
+    <string name="deck4_title">Celebrities</string>
+    <string name="deck4_desc">Stars from the stage, screen, sports, and beyond! Can you portray these famous personalities through gestures and actions? From Beyoncé to Morgan Freeman, bring these icons to life!</string>
 </resources>
