@@ -19,7 +19,9 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-
+import androidx.camera.view.PreviewView;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 import com.example.headsup.R;
 import com.example.headsup.managers.APIManager;
@@ -30,6 +32,7 @@ import com.example.headsup.animation.CardFlipAnimator;
 import com.example.headsup.animation.CircularTimerView;
 import com.example.headsup.animation.ParticleSystem;
 import com.example.headsup.animation.ShakeAnimator;
+import com.example.headsup.managers.CameraManager;
 
 import java.util.ArrayList;
 
@@ -43,12 +46,15 @@ public class GameActivity extends AppCompatActivity{
 
     // managers
     private GameSensorManager sensorManager;
+    private CameraManager cameraManager;
     private SoundManager soundManager;
 
     private APIManager apiManager;
     // vibrators
     private Vibrator vibrator;
-  
+    // camera
+    private static final int CAMERA_PERMISSION_REQUEST = 100;
+//    private SurfaceView cameraPreview;
     private String videoFilePath;
 
     // game elements
@@ -86,7 +92,17 @@ public class GameActivity extends AppCompatActivity{
 
         // force landscape orientation during the game
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
-    
+        
+        // setting up camera preview
+        PreviewView cameraPreview = findViewById(R.id.viewFinder);
+
+        cameraManager = new CameraManager(this, cameraPreview);
+
+        // Replace camera setup with CameraManager initialization
+        cameraManager.startCamera(this);
+            Toast.makeText(this, "Camera permission required", Toast.LENGTH_SHORT).show();
+        }
+
         // init other elements (sensors, apis, animations and views)
         initializeViews();
         initializeAnimations();
@@ -414,7 +430,7 @@ public class GameActivity extends AppCompatActivity{
     @Override
     protected void onDestroy() {
         super.onDestroy();
-
+        
         // Release MediaPlayer resources
         if (soundManager != null) {
             soundManager.release();
