@@ -321,7 +321,9 @@ public class GameActivity extends AppCompatActivity{
         currentWordIndex = 0;
         showNextWord();
         startTimer();
+        if (cameraManager != null) {
             cameraManager.startRecording();
+        }
     }
 
     private void startTimer() {
@@ -438,6 +440,10 @@ public class GameActivity extends AppCompatActivity{
         wordText.setText(getString(R.string.endgame_message));
         circularTimer.setProgress(0f);
         circularTimer.stopPulseAnimation();
+        if (cameraManager != null) {
+            cameraManager.stopRecording();
+            videoFilePath = cameraManager.getVideoFilePath();
+        }
 
         new Handler().postDelayed(this::showGameResults, 1000);
     }
@@ -462,7 +468,9 @@ public class GameActivity extends AppCompatActivity{
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        cameraManager.shutdown();
+        if (cameraManager != null) {
+            cameraManager.shutdown();
+        }
         // Release MediaPlayer resources
         if (soundManager != null) {
             soundManager.release();
