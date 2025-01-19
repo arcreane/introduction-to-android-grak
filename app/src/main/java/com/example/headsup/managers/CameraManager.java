@@ -37,6 +37,9 @@ public class CameraManager {
     private final ExecutorService cameraExecutor;
     private ProcessCameraProvider cameraProvider;
     private VideoCapture<Recorder> videoCapture;
+    private Recording currentRecording;
+    private String videoFilePath;
+    private boolean isRecording = false;
 
     public CameraManager(Context context, PreviewView previewView) {
         this.context = context;
@@ -83,8 +86,63 @@ public class CameraManager {
         }
     }
 
+    @SuppressLint("MissingPermission")
+    public void startRecording() {
+        if (isRecording || videoCapture == null) {
+            Log.e(TAG, "Can't start recording - recorder not initialized or already recording");
+            return;
+        }
+
+        try {
+            File movieDir = new File(context.getExternalFilesDir(Environment.DIRECTORY_MOVIES), "HeadsUp");
+            if (!movieDir.exists()) {
+                movieDir.mkdirs();
+            }
+
+            String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
+            videoFilePath = new File(movieDir, "HeadsUp_" + timestamp + ".mp4").getAbsolutePath();
+
+            FileOutputOptions fileOutputOptions = new FileOutputOptions.Builder(new File(videoFilePath))
+                    .build();
+
+            currentRecording = videoCapture.getOutput()
+                    .prepareRecording(context, fileOutputOptions)
+                    .withAudioEnabled()
+                    .start(ContextCompat.getMainExecutor(context), videoRecordEvent -> {
+                        if (videoRecordEvent instanceof VideoRecordEvent.Start) {
+                            isRecording = true;
+                            Log.d(TAG, "Recording started successfully");
+                        } else if (videoRecordEvent instanceof VideoRecordEvent.Finalize) {
+                            VideoRecordEvent.Finalize finalizeEvent = (VideoRecordEvent.Finalize) videoRecordEvent;
+                            if (!finalizeEvent.hasError()) {
+                                Log.d(TAG, "Recording completed successfully");
+                            } else {
+                                String msg = "Error recording video: " + finalizeEvent.getError();
+                                Log.e(TAG, msg);
+                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show();
+                            }
+                            isRecording = false;
+                        }
+                    });
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error starting recording: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    public void stopRecording() {
+        currentRecording.stop();
+        currentRecording = null;
+        isRecording = false;
+    }
+
+    public String getVideoFilePath() {
+        return videoFilePath;
+    }
 
     public void shutdown() {
+        
         cameraExecutor.shutdown();
     }
 } 
