@@ -183,15 +183,15 @@ public class MainActivity extends AppCompatActivity {
                     backTitle.setText(deck.getTitle());
                     backDesc.setText(deck.getDesc());
 
-//                    actionButton.setOnClickListener(new View.OnClickListener() {
-//                        @Override
-//                        public void onClick(View v) {
-//                            // Navigate to the target activity
-//                            Intent intent = new Intent(MainActivity.this, GameActivity.class);
-//                            intent.putExtra("binId", deck.getBinId());
-//                            startActivity(intent);
-//                        }
-//                    });
+                    actionButton.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            // Navigate to the target activity
+                            Intent intent = new Intent(MainActivity.this, GameActivity.class);
+                            intent.putExtra("binId", deck.getBinId());
+                            startActivity(intent);
+                        }
+                    });
 
                     animatedCard.addView(backContent);
                 }
