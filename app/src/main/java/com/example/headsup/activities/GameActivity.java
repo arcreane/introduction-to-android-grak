@@ -19,7 +19,9 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-
+import androidx.camera.view.PreviewView;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 import com.example.headsup.R;
 import com.example.headsup.managers.APIManager;
@@ -30,6 +32,7 @@ import com.example.headsup.animation.CardFlipAnimator;
 import com.example.headsup.animation.CircularTimerView;
 import com.example.headsup.animation.ParticleSystem;
 import com.example.headsup.animation.ShakeAnimator;
+import com.example.headsup.managers.CameraManager;
 
 import java.util.ArrayList;
 
@@ -43,12 +46,15 @@ public class GameActivity extends AppCompatActivity{
 
     // managers
     private GameSensorManager sensorManager;
+    private CameraManager cameraManager;
     private SoundManager soundManager;
 
     private APIManager apiManager;
     // vibrators
     private Vibrator vibrator;
-  
+    // camera
+    private static final int CAMERA_PERMISSION_REQUEST = 100;
+//    private SurfaceView cameraPreview;
     private String videoFilePath;
 
     // game elements
@@ -86,7 +92,19 @@ public class GameActivity extends AppCompatActivity{
 
         // force landscape orientation during the game
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
-    
+        
+        // setting up camera preview
+        PreviewView cameraPreview = findViewById(R.id.viewFinder);
+
+        cameraManager = new CameraManager(this, cameraPreview);
+
+        // Replace camera setup with CameraManager initialization
+        if (checkPermissions()) {
+        cameraManager.startCamera(this);
+        } else{
+            Toast.makeText(this, "Camera permission required", Toast.LENGTH_SHORT).show();
+        }
+
         // init other elements (sensors, apis, animations and views)
         initializeViews();
         initializeAnimations();
@@ -97,6 +115,35 @@ public class GameActivity extends AppCompatActivity{
         });
     }
 
+    private boolean checkPermissions() {
+        boolean cameraGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED;
+        boolean audioGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
+
+        if (!cameraGranted || !audioGranted) {
+            ActivityCompat.requestPermissions(
+                    this,
+                    new String[]{
+                            Manifest.permission.CAMERA,
+                            Manifest.permission.RECORD_AUDIO
+                    },
+                    CAMERA_PERMISSION_REQUEST
+            );
+            return false;
+        }
+        return true;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == CAMERA_PERMISSION_REQUEST) {
+            if (grantResults.length > 0 &&
+                    grantResults[0] == PackageManager.PERMISSION_GRANTED &&
+                    grantResults[1] == PackageManager.PERMISSION_GRANTED) {
+                cameraManager.startCamera(this);
+            }
+        }
+    }
 
     private void initializeViews() {
         try {
@@ -274,6 +321,9 @@ public class GameActivity extends AppCompatActivity{
         currentWordIndex = 0;
         showNextWord();
         startTimer();
+        if (cameraManager != null) {
+            cameraManager.startRecording();
+        }
     }
 
     private void startTimer() {
@@ -390,6 +440,10 @@ public class GameActivity extends AppCompatActivity{
         wordText.setText(getString(R.string.endgame_message));
         circularTimer.setProgress(0f);
         circularTimer.stopPulseAnimation();
+        if (cameraManager != null) {
+            cameraManager.stopRecording();
+            videoFilePath = cameraManager.getVideoFilePath();
+        }
 
         new Handler().postDelayed(this::showGameResults, 1000);
     }
@@ -414,7 +468,9 @@ public class GameActivity extends AppCompatActivity{
     @Override
     protected void onDestroy() {
         super.onDestroy();
-
+        if (cameraManager != null) {
+            cameraManager.shutdown();
+        }
         // Release MediaPlayer resources
         if (soundManager != null) {
             soundManager.release();

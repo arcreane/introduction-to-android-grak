@@ -5,7 +5,6 @@ import android.animation.AnimatorInflater;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
-import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -70,6 +69,70 @@ public class MainActivity extends AppCompatActivity {
         });
 
         recyclerView.setAdapter(adapter);
+
+        // Video background setup
+        setupVideoBackground();
+    }
+
+    private void setupVideoBackground() {
+        VideoView videoView = findViewById(R.id.videoView);
+
+        // Try to get the last saved video
+        File headsUpDir = new File(Environment.getExternalStoragePublicDirectory(
+                Environment.DIRECTORY_MOVIES), "HeadsUp");
+
+        Uri videoUri = null;
+        if (headsUpDir.exists() && headsUpDir.isDirectory()) {
+            File[] files = headsUpDir.listFiles((dir, name) -> name.toLowerCase().endsWith(".mp4"));
+            if (files != null && files.length > 0) {
+                // Sort files by last modified time to get the most recent one
+                Arrays.sort(files, (f1, f2) -> Long.compare(f2.lastModified(), f1.lastModified()));
+                videoUri = Uri.fromFile(files[0]);
+            }
+        }
+
+        // If no saved video found, use the default one
+        if (videoUri == null) {
+            videoUri = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.memories2);
+        }
+
+        videoView.setVideoURI(videoUri);
+        videoView.start();
+
+        // here just looping video and muting
+        videoView.setOnPreparedListener(mp -> {
+            mp.setLooping(true);
+            mp.setVolume(0, 0);  // This line mutes the video (left and right channels)
+        });
+
+        // Handle video errors
+        videoView.setOnErrorListener((mp, what, extra) -> {
+            // If there's an error with the saved video, fall back to the default one
+            Uri defaultUri = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.memories2);
+            videoView.setVideoURI(defaultUri);
+            videoView.start();
+            return true;
+        });
+    }
+
+    // important to resume video again when user reenters activity
+    @Override
+    protected void onResume() {
+        super.onResume();
+        VideoView videoView = findViewById(R.id.videoView);
+        if (!videoView.isPlaying()) {
+            setupVideoBackground();
+        }
+    }
+
+    // important to pause video when activity has been left (but still in background)
+    @Override
+    protected void onPause() {
+        super.onPause();
+        VideoView videoView = findViewById(R.id.videoView);
+        if (videoView.isPlaying()) {
+            videoView.pause();
+        }
     }
 
     // zoom in animation for onclick in deck
