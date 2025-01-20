@@ -7,22 +7,22 @@
     android:background="@drawable/card_background">
 
     <!-- Camera Preview in top-right corner -->
-    <!--    <SurfaceView-->
-    <!--        android:id="@+id/cameraPreview"-->
-    <!--        android:layout_width="160dp"-->
-    <!--        android:layout_height="120dp"-->
-    <!--        android:layout_alignParentTop="true"-->
-    <!--        android:layout_alignParentEnd="true"-->
-    <!--        android:rotation="0"-->
-    <!--        android:layout_margin="16dp" />-->
+<!--    <SurfaceView-->
+<!--        android:id="@+id/cameraPreview"-->
+<!--        android:layout_width="160dp"-->
+<!--        android:layout_height="120dp"-->
+<!--        android:layout_alignParentTop="true"-->
+<!--        android:layout_alignParentEnd="true"-->
+<!--        android:rotation="0"-->
+<!--        android:layout_margin="16dp" />-->
     <androidx.camera.view.PreviewView
         android:id="@+id/viewFinder"
         android:layout_width="160dp"
-        android:layout_height="120dp"
-        android:layout_alignParentTop="true"
-        android:layout_alignParentEnd="true"
-        android:rotation="0"
-        android:layout_margin="16dp" />
+            android:layout_height="120dp"
+            android:layout_alignParentTop="true"
+            android:layout_alignParentEnd="true"
+            android:rotation="0"
+            android:layout_margin="16dp" />
 
     <FrameLayout
         android:id="@+id/timerContainer"
@@ -68,6 +68,11 @@
 
     </FrameLayout>
 
+    <com.example.headsup.animation.ParticleSystem
+        android:id="@+id/particleSystem"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_centerInParent="true" />
 
     <TextView
         android:id="@+id/gyroText"
