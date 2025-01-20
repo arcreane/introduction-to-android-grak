@@ -1,6 +1,7 @@
 package com.example.headsup.activities;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
@@ -16,7 +17,9 @@ import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.camera.view.PreviewView;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
@@ -24,8 +27,12 @@ import com.example.headsup.R;
 import com.example.headsup.managers.APIManager;
 import com.example.headsup.managers.GameSensorManager;
 import com.example.headsup.managers.SoundManager;
-
-
+import com.example.headsup.models.WordResult;
+import com.example.headsup.animation.CardFlipAnimator;
+import com.example.headsup.animation.CircularTimerView;
+import com.example.headsup.animation.ParticleSystem;
+import com.example.headsup.animation.ShakeAnimator;
+import com.example.headsup.managers.CameraManager;
 
 import java.util.ArrayList;
 
@@ -34,13 +41,12 @@ public class GameActivity extends AppCompatActivity{
     // text views
     private TextView wordText;
     private TextView timerText;
-
-
     // layouts
     private RelativeLayout mainLayout;
 
     // managers
     private GameSensorManager sensorManager;
+    private CameraManager cameraManager;
     private SoundManager soundManager;
 
     private APIManager apiManager;
@@ -49,21 +55,19 @@ public class GameActivity extends AppCompatActivity{
     // camera
     private static final int CAMERA_PERMISSION_REQUEST = 100;
 //    private SurfaceView cameraPreview;
-
     private String videoFilePath;
 
     // game elements
     private ArrayList<String> words;
     private int currentWordIndex = 0;
     private boolean isGameRunning = true;
-    private boolean timerRunning = false;
     private CountDownTimer gameTimer;
     private long timeLeftInMillis = 60000;
-    private boolean gameStarted = false;
     private boolean countdownStarted = false;
     private CountDownTimer startCountdown;
     private boolean wordGuessed = false;
     private int score = 0;
+    private final ArrayList<WordResult> wordResults = new ArrayList<>();
     private long wordStartTime;
     private int correctWords = 0;
     private int passedWords = 0;
@@ -71,7 +75,11 @@ public class GameActivity extends AppCompatActivity{
     // API
     private String binId;
 
-
+    // New animation components
+    private CardFlipAnimator cardFlipAnimator;
+    private CircularTimerView circularTimer;
+    private ParticleSystem particleSystem;
+    private ShakeAnimator shakeAnimator;
     private FrameLayout cardContainer;
 
     @Override
@@ -84,18 +92,57 @@ public class GameActivity extends AppCompatActivity{
 
         // force landscape orientation during the game
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
-
+        
         // setting up camera preview
-//        cameraPreview = findViewById(R.id.cameraPreview);
+        PreviewView cameraPreview = findViewById(R.id.viewFinder);
 
+        cameraManager = new CameraManager(this, cameraPreview);
+
+        // Replace camera setup with CameraManager initialization
+        if (checkPermissions()) {
+        cameraManager.startCamera(this);
+        } else{
+            Toast.makeText(this, "Camera permission required", Toast.LENGTH_SHORT).show();
+        }
 
         // init other elements (sensors, apis, animations and views)
         initializeViews();
+        initializeAnimations();
         setupSensors();
         apiManager = new APIManager();
         apiManager.setupRetrofitAsync(binId, wordList -> {
             words = wordList;
         });
+    }
+
+    private boolean checkPermissions() {
+        boolean cameraGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED;
+        boolean audioGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
+
+        if (!cameraGranted || !audioGranted) {
+            ActivityCompat.requestPermissions(
+                    this,
+                    new String[]{
+                            Manifest.permission.CAMERA,
+                            Manifest.permission.RECORD_AUDIO
+                    },
+                    CAMERA_PERMISSION_REQUEST
+            );
+            return false;
+        }
+        return true;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == CAMERA_PERMISSION_REQUEST) {
+            if (grantResults.length > 0 &&
+                    grantResults[0] == PackageManager.PERMISSION_GRANTED &&
+                    grantResults[1] == PackageManager.PERMISSION_GRANTED) {
+                cameraManager.startCamera(this);
+            }
+        }
     }
 
     private void initializeViews() {
@@ -105,24 +152,20 @@ public class GameActivity extends AppCompatActivity{
             wordText = findViewById(R.id.wordText);
             timerText = findViewById(R.id.timerView);
             cardContainer = findViewById(R.id.cardContainer);
+            circularTimer = findViewById(R.id.circularTimer);
+            particleSystem = findViewById(R.id.particleSystem);
 
             // getting vibrator
             vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
 
-            // initialize sound effects
-//            countdownSound = MediaPlayer.create(this, R.raw.beep);
-//            startSound = MediaPlayer.create(this, R.raw.startgame);
-//            correctSound = MediaPlayer.create(this, R.raw.correct);
-//            passSound = MediaPlayer.create(this, R.raw.pass);
-//            finalSound = MediaPlayer.create(this, R.raw.final10);
             soundManager = new SoundManager(this);
 
             // set default welcome message
             wordText.setText(getString(R.string.welcome_messsage_game));
-
+            
             // shadow effect for card
             cardContainer.setElevation(0f);
-
+            
         } catch (Exception e) {
             Log.e("GameActivity", "Error initializing views", e);
             Toast.makeText(this, "Error initializing game", Toast.LENGTH_SHORT).show();
@@ -130,16 +173,23 @@ public class GameActivity extends AppCompatActivity{
         }
     }
 
-    private boolean checkCameraPermission() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST);
-            return false;
+
+
+
+    private void initializeAnimations() {
+        try {
+            if (cardContainer != null && wordText != null) {
+                cardFlipAnimator = new CardFlipAnimator(cardContainer, wordText);
+                shakeAnimator = new ShakeAnimator(cardContainer);
+                
+                // Configure animations
+                cardFlipAnimator.setFlipDuration(400);
+                shakeAnimator.setDuration(500);
+                shakeAnimator.setIntensity(25f);
+            }
+        } catch (Exception e) {
+            Log.e("GameActivity", "Error initializing animations", e);
         }
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECORD_AUDIO}, CAMERA_PERMISSION_REQUEST);
-            return false;
-        }
-        return true;
     }
 
     private void setupSensors() {
@@ -222,14 +272,12 @@ public class GameActivity extends AppCompatActivity{
             @Override
             public void onFinish() {
                 soundManager.playStartSound();
-                gameStarted = true;
                 sensorManager.setGameStarted(true);
                 startGame();
             }
         }.start();
     }
 
-    // Update onResume():
     @Override
     protected void onResume() {
         super.onResume();
@@ -237,19 +285,18 @@ public class GameActivity extends AppCompatActivity{
         sensorManager.resetTiltState();
     }
 
-    // Update onPause():
     @Override
     protected void onPause() {
         super.onPause();
         sensorManager.stopListening();
         if (gameTimer != null) {
             gameTimer.cancel();
-            timerRunning = false;
         }
     }
 
+    @SuppressLint("UseCompatLoadingForDrawables")
     private void showNextWord() {
-        if (!isGameRunning || words == null || words.isEmpty()) {
+        if (!isGameRunning || cardFlipAnimator == null || words == null || words.isEmpty()) {
             return;
         }
 
@@ -257,12 +304,15 @@ public class GameActivity extends AppCompatActivity{
         if (currentWordIndex < words.size()) {
             wordStartTime = System.currentTimeMillis();
             String nextWord = words.get(currentWordIndex);
+            cardFlipAnimator.flipToNext(nextWord, null);
             currentWordIndex++;
 
             // Resume final sound if needed
             if (soundManager.shouldPlayFinalSound()  && !soundManager.isFinalSoundPlaying() && timeLeftInMillis / 1000 < 11) {
                 soundManager.playFinalSound();
             }
+        } else {
+            showGameResults();
         }
     }
 
@@ -271,6 +321,9 @@ public class GameActivity extends AppCompatActivity{
         currentWordIndex = 0;
         showNextWord();
         startTimer();
+        if (cameraManager != null) {
+            cameraManager.startRecording();
+        }
     }
 
     private void startTimer() {
@@ -282,9 +335,10 @@ public class GameActivity extends AppCompatActivity{
             @Override
             public void onTick(long millisUntilFinished) {
                 timeLeftInMillis = millisUntilFinished;
-                String timeStr = String.format("0:%02d", millisUntilFinished / 1000);
+                @SuppressLint("DefaultLocale") String timeStr = String.format("0:%02d", millisUntilFinished / 1000);
                 timerText.setText(timeStr);
-
+                circularTimer.setProgress(millisUntilFinished / (float) 60000);
+                
                 if (millisUntilFinished / 1000 < 11) {
                     soundManager.setShouldPlayFinalSound(true);
                     if (!wordGuessed && !soundManager.isFinalSoundPlaying()) {
@@ -298,19 +352,17 @@ public class GameActivity extends AppCompatActivity{
                 endGame();
             }
         }.start();
-        timerRunning = true;
     }
 
     private void pauseTimer() {
         if (gameTimer != null) {
             gameTimer.cancel();
-            timerRunning = false;
         }
     }
 
     private void handleCorrectGuess() {
         if (!isGameRunning) return;
-
+        
         pauseTimer();
 
         soundManager.playCorrectSound();
@@ -320,16 +372,25 @@ public class GameActivity extends AppCompatActivity{
         }
         mainLayout.setBackground(getResources().getDrawable(R.drawable.correct_overlay));
         wordText.setText(getString(R.string.correct_message));
-
+        
         // Record word result
         if (currentWordIndex > 0) {
             String word = words.get(currentWordIndex - 1);
             long timeTaken = System.currentTimeMillis() - wordStartTime;
+            wordResults.add(new WordResult(word, true, timeTaken));
             score += 10;
             correctWords++;
         }
-
-
+        
+        // Emit confetti particles with post delay to ensure view is measured
+        if (particleSystem != null) {
+            particleSystem.post(() -> {
+                float centerX = particleSystem.getWidth() / 2f;
+                float centerY = particleSystem.getHeight() / 2f;
+                particleSystem.emitParticles(centerX, centerY, true);
+            });
+        }
+        
         if (vibrator != null) {
             long[] pattern = {0, 250, 100, 250};
             vibrator.vibrate(VibrationEffect.createWaveform(pattern, -1));
@@ -338,7 +399,7 @@ public class GameActivity extends AppCompatActivity{
 
     private void handleWrongGuess() {
         if (!isGameRunning) return;
-
+        
 
         pauseTimer();
         soundManager.playPassSound();
@@ -347,14 +408,25 @@ public class GameActivity extends AppCompatActivity{
         }
         wordText.setText(getString(R.string.pass_message));
         mainLayout.setBackground(getResources().getDrawable(R.drawable.wrong_overlay));
-
+        
         // Record word result
         if (currentWordIndex > 0) {
             String word = words.get(currentWordIndex - 1);
             long timeTaken = System.currentTimeMillis() - wordStartTime;
+            wordResults.add(new WordResult(word, false, timeTaken));
             passedWords++;
         }
-
+        
+        // Emit X particles and shake with post delay
+        if (particleSystem != null && shakeAnimator != null) {
+            particleSystem.post(() -> {
+                float centerX = particleSystem.getWidth() / 2f;
+                float centerY = particleSystem.getHeight() / 2f;
+                particleSystem.emitParticles(centerX, centerY, false);
+                shakeAnimator.shake();
+            });
+        }
+        
         if (vibrator != null) {
             vibrator.vibrate(VibrationEffect.createOneShot(100, VibrationEffect.DEFAULT_AMPLITUDE));
         }
@@ -366,14 +438,39 @@ public class GameActivity extends AppCompatActivity{
         vibrator.vibrate(VibrationEffect.createWaveform(pattern, -1));
         timerText.setText(getString(R.string.endgame_timer));
         wordText.setText(getString(R.string.endgame_message));
+        circularTimer.setProgress(0f);
+        circularTimer.stopPulseAnimation();
+        if (cameraManager != null) {
+            cameraManager.stopRecording();
+            videoFilePath = cameraManager.getVideoFilePath();
+        }
 
+        new Handler().postDelayed(this::showGameResults, 1000);
     }
+
+    private void showGameResults() {
+        Intent intent = new Intent(this, GameResultsActivity.class);
+        intent.putExtra("score", score);
+        intent.putExtra("wordsAttempted", correctWords + passedWords);
+        intent.putExtra("correctWords", correctWords);
+        intent.putExtra("passedWords", passedWords);
+        intent.putExtra("wordResults", wordResults);
+        intent.putExtra("binId", getIntent().getStringExtra("binId"));
+        intent.putExtra("score", score); // Your existing score
+        intent.putExtra("videoPath", videoFilePath); // Add the video path
+        startActivity(intent);
+        finish();
+        overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
+    }
+
 
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-
+        if (cameraManager != null) {
+            cameraManager.shutdown();
+        }
         // Release MediaPlayer resources
         if (soundManager != null) {
             soundManager.release();
